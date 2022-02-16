@@ -68,11 +68,13 @@ def get_api_answer(current_timestamp):
 
 
 def check_response(response):
-    """Проверка ответа API на корректность."""
+    """Проверяет ответ API на корректность."""
     try:
         homeworks = response['homeworks']
-    except KeyError:
-        raise KeyError('Нет ключа')
+    except KeyError as error:
+        raise KeyError(f'{error} не верный ответ API')
+    if not homeworks:
+        logger.debug('Статус проверки не изменился')
     if not isinstance(homeworks, list):
         logger.error('Неверный список работ.')
         raise TypeError('Неверный список работ.')
@@ -81,27 +83,25 @@ def check_response(response):
 
 def parse_status(homework):
     """Изменения информации о проверке работы."""
-    # При попытке отправить в работу пустой список,
-    # были ошибки, решил вот так их убрать
-    if homework != []:
-        homework_name = homework[0]['homework_name']
-        homework_status = homework[0]['status']
-        if homework_status not in HOMEWORK_STATUSES:
-            logger.error(
-                f'Статус {homework_status} '
-                f'задания "{homework_name}" не задан')
-            raise KeyError(
-                f'Статус {homework_status} '
-                f'задания "{homework_name}" не задан')
-        verdict = HOMEWORK_STATUSES[homework_status]
-        if homework_status in HOMEWORK_STATUSES:
-            return (
-                f'Изменился статус проверки работы '
-                f'"{homework_name}". {verdict}')
-        raise Exception(
+    homework_name = homework['homework_name']
+    # хотел сделать так homework_name = homework[0]['homework_name']
+    # но pytest ругается, по мне так логично :)
+    homework_status = homework['status']
+    if homework_status not in HOMEWORK_STATUSES:
+        logger.error(
             f'Статус {homework_status} '
             f'задания "{homework_name}" не задан')
-    return homework
+        raise KeyError(
+            f'Статус {homework_status} '
+            f'задания "{homework_name}" не задан')
+    verdict = HOMEWORK_STATUSES[homework_status]
+    if homework_status in HOMEWORK_STATUSES:
+        return (
+            f'Изменился статус проверки работы '
+            f'"{homework_name}". {verdict}')
+    raise Exception(
+        f'Статус {homework_status} '
+        f'задания "{homework_name}" не задан')
 
 
 def check_tokens():
