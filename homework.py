@@ -82,26 +82,21 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Изменения информации о проверке работы."""
-    homework_name = homework['homework_name']
-    # хотел сделать так homework_name = homework[0]['homework_name']
-    # но pytest ругается, по мне так логично :)
-    homework_status = homework['status']
-    if homework_status not in HOMEWORK_STATUSES:
-        logger.error(
-            f'Статус {homework_status} '
-            f'задания "{homework_name}" не задан')
-        raise KeyError(
-            f'Статус {homework_status} '
-            f'задания "{homework_name}" не задан')
-    verdict = HOMEWORK_STATUSES[homework_status]
-    if homework_status in HOMEWORK_STATUSES:
-        return (
-            f'Изменился статус проверки работы '
-            f'"{homework_name}". {verdict}')
-    raise Exception(
-        f'Статус {homework_status} '
-        f'задания "{homework_name}" не задан')
+    """Извлекает из информации о конкретной домашней работе."""
+    try:
+        homework_name = homework['homework_name']
+        homework_status = homework['status']
+    except Exception as error:
+        logger.error(f'неизвестная ошибка {error}')
+        raise KeyError('Ключ не найден')
+    else:
+        if homework_status not in HOMEWORK_STATUSES:
+            logger.error('Статус задания  не задан')
+        verdict = HOMEWORK_STATUSES[homework_status]
+        if homework_status in HOMEWORK_STATUSES:
+            return (
+                f'Изменился статус проверки работы '
+                f'"{homework_name}". {verdict}')
 
 
 def check_tokens():
@@ -125,24 +120,29 @@ def main():
         return
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
+    current_timestamp = 1643546324
     while True:
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
-            verdict = parse_status(homeworks)
             # Если homeworks пуст, ничего не шлем никуда
-            if verdict != []:
+            if homeworks != []:
+                verdict = parse_status(homeworks[0])
+                print(f'---{verdict}')
                 homework_status = homeworks[0]['status']
                 send_message(bot, verdict)
+                # logger.info(f'{verdict}')
                 # Останавливаю работу бота если задание проверили
                 for key in HOMEWORK_STATUSES:
                     if homework_status in key:
                         time.sleep(5)
                         send_message(bot, 'я стоп')
+                        # logger.info('Торможу прогу')
                         sys.exit()
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             send_message(bot, message)
+            logger.debug(f'Ошибка: {error}', exc_info=True)
         else:
             current_timestamp = response['current_date']
         finally:
