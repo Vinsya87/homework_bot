@@ -2,11 +2,11 @@ import logging
 import os
 import sys
 import time
+from http import HTTPStatus
 
 import requests
 import telegram
 from dotenv import load_dotenv
-
 load_dotenv()
 
 
@@ -58,41 +58,49 @@ def get_api_answer(current_timestamp):
             ENDPOINT, headers=HEADERS, params=params)
     except Exception as error:
         logger.critical(f'Вид ошибки: {error}')
-    jjson = homework_statuses.json()
-    return jjson
+    else:
+        if homework_statuses.status_code != HTTPStatus.OK.value:
+            logger.critical(
+                f'Вид ошибки: {ENDPOINT} недоступен. '
+                f'Ответ: {homework_statuses.status_code}')
+            raise Exception('Нет доступа к API')
+        return homework_statuses.json()
 
 
 def check_response(response):
-    """Проверяет ответ API на корректность."""
+    """Проверка ответа API на корректность."""
     try:
         homeworks = response['homeworks']
-    except KeyError as error:
-        logger.error(f'{error} не верный ответ API')
-    if not homeworks:
-        logger.debug('Статус проверки не изменился')
+    except KeyError:
+        raise KeyError('Нет ключа')
+    if not isinstance(homeworks, list):
+        logger.error('Неверный список работ.')
+        raise TypeError('Неверный список работ.')
     return homeworks
 
 
 def parse_status(homework):
-    """Извлекает из информации о конкретной домашней работе."""
+    """Изменения информации о проверке работы."""
+    # При попытке отправить в работу пустой список,
+    # были ошибки, решил вот так их убрать
     if homework != []:
-        try:
-            homework_name = homework[0]['homework_name']
-            homework_status = homework[0]['status']
-            # return[homework_name, homework_status]
-        except KeyError as error:
-            logger.error(f'{error} не верный ответ API')
-        except Exception as error:
-            logger.error(f'неизвестная ошибка {error}')
-        else:
-            if homework_status not in HOMEWORK_STATUSES:
-                logger.error(
-                    f'Статус {homework_status} '
-                    f'задания "{homework_name}" не задан')
-            verdict = HOMEWORK_STATUSES[homework_status]
+        homework_name = homework[0]['homework_name']
+        homework_status = homework[0]['status']
+        if homework_status not in HOMEWORK_STATUSES:
+            logger.error(
+                f'Статус {homework_status} '
+                f'задания "{homework_name}" не задан')
+            raise KeyError(
+                f'Статус {homework_status} '
+                f'задания "{homework_name}" не задан')
+        verdict = HOMEWORK_STATUSES[homework_status]
+        if homework_status in HOMEWORK_STATUSES:
             return (
                 f'Изменился статус проверки работы '
                 f'"{homework_name}". {verdict}')
+        raise Exception(
+            f'Статус {homework_status} '
+            f'задания "{homework_name}" не задан')
     return homework
 
 
@@ -116,8 +124,7 @@ def main():
     if not check_tokens():
         return
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    # current_timestamp = int(time.time())
-    current_timestamp = 0
+    current_timestamp = int(time.time())
     while True:
         try:
             response = get_api_answer(current_timestamp)
