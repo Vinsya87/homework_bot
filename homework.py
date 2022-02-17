@@ -29,7 +29,7 @@ ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
 
-HOMEWORK_STATUSES = {
+HOMEWORK_VERDICTS = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
@@ -57,14 +57,15 @@ def get_api_answer(current_timestamp):
         homework_statuses = requests.get(
             ENDPOINT, headers=HEADERS, params=params)
     except Exception as error:
-        logger.critical(f'Вид ошибки: {error}')
-    else:
-        if homework_statuses.status_code != HTTPStatus.OK.value:
-            logger.critical(
-                f'Вид ошибки: {ENDPOINT} недоступен. '
-                f'Ответ: {homework_statuses.status_code}')
-            raise Exception('Нет доступа к API')
-        return homework_statuses.json()
+        raise Exception(f'Вид ошибки: {error}')
+    if homework_statuses.status_code != HTTPStatus.OK.value:
+        logger.critical(
+            f'Вид ошибки: {ENDPOINT} недоступен. '
+            f'Ответ: {homework_statuses.status_code}')
+        raise Exception('Нет доступа к API')
+    if not homework_statuses:
+        raise Exception('Ответ API пустой')
+    return homework_statuses.json()
 
 
 def check_response(response):
@@ -85,18 +86,27 @@ def parse_status(homework):
     """Извлекает из информации о конкретной домашней работе."""
     try:
         homework_name = homework['homework_name']
-        homework_status = homework['status']
-    except Exception as error:
-        logger.error(f'неизвестная ошибка {error}')
+    except KeyError:
+        logger.error('Ключ не найден')
         raise KeyError('Ключ не найден')
-    else:
-        if homework_status not in HOMEWORK_STATUSES:
-            logger.error('Статус задания  не задан')
-        verdict = HOMEWORK_STATUSES[homework_status]
-        if homework_status in HOMEWORK_STATUSES:
-            return (
-                f'Изменился статус проверки работы '
-                f'"{homework_name}". {verdict}')
+    except Exception as error:
+        logger.error(f'Неизвестная ошибка: {error}')
+        raise Exception(f'Неизвестная ошибка: {error}')
+    try:
+        homework_status = homework['status']
+    except KeyError:
+        logger.error(f'Ключ {homework_status} не найден')
+        raise KeyError(f'Ключ {homework_status} не найден')
+    except Exception as error:
+        logger.error(f'Неизвестная ошибка: {error}')
+        raise Exception(f'Неизвестная ошибка: {error}')
+    if homework_status not in HOMEWORK_VERDICTS:
+        logger.error('Статус задания  не задан')
+        raise Exception('Статус задания  не задан')
+    verdict = HOMEWORK_VERDICTS[homework_status]
+    return (
+        f'Изменился статус проверки работы '
+        f'"{homework_name}". {verdict}')
 
 
 def check_tokens():
@@ -120,29 +130,36 @@ def main():
         return
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    # current_timestamp = 1643546324
+    current_timestamp = 1643546324
+    msg_error = ''
     while True:
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
             # Если homeworks пуст, ничего не шлем никуда
-            if homeworks != []:
-                verdict = parse_status(homeworks[0])
-                print(f'---{verdict}')
-                homework_status = homeworks[0]['status']
+            if not homeworks:
+                return
+            verdict = parse_status(homeworks[0])
+            homework_status = homeworks[0]['status']
+            # Останавливаю работу бота если задание проверили
+            for key in HOMEWORK_VERDICTS:
+                if homework_status in 'reviewing':
+                    send_message(bot, verdict)
+                    # logger.info(f'{verdict}')
+                    pass
                 send_message(bot, verdict)
                 # logger.info(f'{verdict}')
-                # Останавливаю работу бота если задание проверили
-                for key in HOMEWORK_STATUSES:
-                    if homework_status in key:
-                        time.sleep(5)
-                        send_message(bot, 'я стоп')
-                        # logger.info('Торможу прогу')
-                        sys.exit()
+                time.sleep(5)
+                send_message(bot, 'я стоп')
+                # logger.info('Торможу прогу')
+                sys.exit()
         except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            send_message(bot, message)
-            logger.debug(f'Ошибка: {error}', exc_info=True)
+            error = f'Сбой в работе программы: {error}'
+            if error != msg_error:
+                send_message(bot, msg_error)
+                # logger.info(f'{msg_error}')
+                logger.debug(f'Ошибка: {error}', exc_info=True)
+            msg_error = error
         else:
             current_timestamp = response['current_date']
         finally:
