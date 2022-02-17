@@ -130,7 +130,7 @@ def main():
         return
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    current_timestamp = 1643546324
+    # current_timestamp = 1643546324
     msg_error = ''
     while True:
         try:
