@@ -84,25 +84,28 @@ def check_response(response):
 
 def parse_status(homework):
     """Извлекает из информации о конкретной домашней работе."""
+    key_error = 'Ключ не найден'
+    noname_error = 'Неизвестная ошибка:'
+    status_msg = 'Статус задания  не задан'
     try:
         homework_name = homework['homework_name']
     except KeyError:
-        logger.error('Ключ не найден')
-        raise KeyError('Ключ не найден')
+        logger.error(f'{key_error}')
+        raise KeyError(f'{key_error}')
     except Exception as error:
-        logger.error(f'Неизвестная ошибка: {error}')
-        raise Exception(f'Неизвестная ошибка: {error}')
+        logger.error(f'{noname_error} {error}')
+        raise Exception(f'{noname_error} {error}')
     try:
         homework_status = homework['status']
     except KeyError:
         logger.error(f'Ключ {homework_status} не найден')
         raise KeyError(f'Ключ {homework_status} не найден')
     except Exception as error:
-        logger.error(f'Неизвестная ошибка: {error}')
-        raise Exception(f'Неизвестная ошибка: {error}')
+        logger.error(f'{noname_error} {error}')
+        raise Exception(f'{noname_error} {error}')
     if homework_status not in HOMEWORK_VERDICTS:
-        logger.error('Статус задания  не задан')
-        raise Exception('Статус задания  не задан')
+        logger.error(f'{status_msg}')
+        raise Exception(f'{status_msg}')
     verdict = HOMEWORK_VERDICTS[homework_status]
     return (
         f'Изменился статус проверки работы '
@@ -130,7 +133,6 @@ def main():
         return
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    # current_timestamp = 1643546324
     msg_error = ''
     while True:
         try:
@@ -145,21 +147,17 @@ def main():
             for key in HOMEWORK_VERDICTS:
                 if homework_status in 'reviewing':
                     send_message(bot, verdict)
-                    # logger.info(f'{verdict}')
                     pass
                 send_message(bot, verdict)
-                # logger.info(f'{verdict}')
                 time.sleep(5)
                 send_message(bot, 'я стоп')
-                # logger.info('Торможу прогу')
                 sys.exit()
         except Exception as error:
             error = f'Сбой в работе программы: {error}'
             if error != msg_error:
                 send_message(bot, msg_error)
-                # logger.info(f'{msg_error}')
                 logger.debug(f'Ошибка: {error}', exc_info=True)
-            msg_error = error
+                msg_error = error
         else:
             current_timestamp = response['current_date']
         finally:
