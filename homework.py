@@ -47,6 +47,7 @@ def send_message(bot, message):
         logger.error(f'Не удалось отправить сообщение "{message}"')
     else:
         logger.info(f'Бот отправил сообщение "{message}"')
+        return True
 
 
 def get_api_answer(current_timestamp):
@@ -133,6 +134,7 @@ def main():
         return
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
+    current_timestamp = 1644483636
     msg_error = ''
     while True:
         try:
@@ -140,24 +142,16 @@ def main():
             homeworks = check_response(response)
             # Если homeworks пуст, ничего не шлем никуда
             if not homeworks:
-                return
+                continue
             verdict = parse_status(homeworks[0])
-            homework_status = homeworks[0]['status']
-            # Останавливаю работу бота если задание проверили
-            for key in HOMEWORK_VERDICTS:
-                if homework_status in 'reviewing':
-                    send_message(bot, verdict)
-                    pass
-                send_message(bot, verdict)
-                time.sleep(5)
-                send_message(bot, 'я стоп')
-                sys.exit()
+            send_message(bot, verdict)
         except Exception as error:
             error = f'Сбой в работе программы: {error}'
             if error != msg_error:
                 send_message(bot, msg_error)
                 logger.debug(f'Ошибка: {error}', exc_info=True)
-                msg_error = error
+                if send_message in True:
+                    msg_error = error
         else:
             current_timestamp = response['current_date']
         finally:
