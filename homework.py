@@ -149,7 +149,7 @@ def main():
             if error != msg_error:
                 send_var = send_message(bot, msg_error)
                 logger.debug(f'Ошибка: {error}', exc_info=True)
-                if send_var in True:
+                if send_var:
                     msg_error = error
         else:
             current_timestamp = response['current_date']
